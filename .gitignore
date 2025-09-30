@@ -15,8 +15,25 @@ env/
 ENV/
 
 # Modelos treinados e dados temporários  
-# models/*.pkl
-# data/algorithm_comparison.csv
+models/*.pkl
+data/algorithm_comparison.csv
+data/tic-tac-toe.data
+web/
+
+# Treinamento/artefatos derivados adicionais
+models/**/*.joblib
+models/**/*.sav
+data/*.csv
+data/*.pkl
+data/*.npy
+
+# Caches e ferramentas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+.ipynb_checkpoints/
 
 # IDEs e editores
 .vscode/

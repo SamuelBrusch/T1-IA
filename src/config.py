@@ -6,9 +6,9 @@ MODELS_DIR = os.path.join(PROJECT_ROOT, 'models')
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 
 # Arquivos principais
-BEST_MODEL_PATH = os.path.join(MODELS_DIR, 'best_model_s.pkl')
-SCALER_PATH = os.path.join(MODELS_DIR, 'scaler_s.pkl')
-METADATA_PATH = os.path.join(MODELS_DIR, 'model_metadata_s.pkl')
+BEST_MODEL_PATH = os.path.join(MODELS_DIR, 'best_model.pkl')
+SCALER_PATH = os.path.join(MODELS_DIR, 'scaler.pkl')
+METADATA_PATH = os.path.join(MODELS_DIR, 'model_metadata.pkl')
 DATASET_PATH = os.path.join(DATA_DIR, 'tic-tac-toe.data')
 RESULTS_PATH = os.path.join(DATA_DIR, 'algorithm_comparison.csv')
 

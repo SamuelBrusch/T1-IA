@@ -1,93 +1,62 @@
-# 🎮 Jogo da Velha com IA Classificadora
+# Jogo da Velha com IA Classificadora
 
-> Trabalho de Inteligência Artificial - Implementação seguindo exatamente o enunciado
+Trabalho de Inteligência Artificial.
 
-## 📋 Especificações Implementadas
+Projeto em Python que treina 4 algoritmos (k-NN, MLP, Árvore de Decisão, Random Forest) para classificar o estado do Jogo da Velha em tempo real durante partidas Humano vs IA. O jogador escolhe qual algoritmo enfrentar; a IA faz jogadas aleatórias.
 
-- ✅ **4 algoritmos de IA**: k-NN, MLP, Árvore de Decisão, Random Forest
-- ✅ **Dataset balanceado**: 250 amostras por classe (exceto Empate)
-- ✅ **Divisão física**: 80% treino, 10% validação, 10% teste
-- ✅ **Front-end**: Humano vs Humano (dois jogadores)
-- ✅ **IA classifica estados**: A cada jogada em tempo real
-- ✅ **Variáveis personalizadas**: Todas terminam com `_s` (simulando `_$`)
+## Requisitos
 
-## 🚀 Como Usar
+- Python 3.10+
+- Windows PowerShell (os comandos abaixo usam PowerShell)
 
-### 1. Configurar Ambiente
+## Como rodar (Windows)
 
-```bash
-# Ativar ambiente virtual
-.\.venv\Scripts\Activate.ps1  # Windows PowerShell
-# ou
-source .venv/bin/activate     # Linux/Mac
+1) Ative o ambiente virtual e instale as dependências:
 
-# Instalar dependências
+```
+\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-### 2. Executar
+2) (Opcional) Treine/re-treine os modelos:
 
-```bash
-# Jogar (usa modelo existente - RÁPIDO)
-python main.py
-
-# Treinar novamente (só quando necessário - LENTO)
+```
 python main.py --train
 ```
 
-## 📁 Estrutura do Projeto
+3) Rode o jogo (treina automaticamente se não houver modelo):
+
+```
+python main.py
+```
+
+Na abertura, selecione o algoritmo (1-4). No tabuleiro, use posições como A1, B2, C3. Digite "sair" para encerrar.
+
+## Estrutura do Projeto
 
 ```
 T1 IA/
-├── src/                      # Código fonte
-│   ├── config.py            # Configurações e caminhos
-│   ├── data_and_train.py    # Treinamento dos algoritmos
-│   └── game.py              # Interface do jogo
-├── models/                  # Modelos treinados
-│   ├── best_model_s.pkl     # Melhor modelo
-│   ├── scaler_s.pkl         # Normalizador (se MLP)
-│   └── model_metadata_s.pkl # Metadados
-├── data/                    # Dados e resultados
-│   ├── tic-tac-toe.data     # Dataset UCI
-│   └── algorithm_comparison.csv # Resultados dos testes
-├── docs/                    # Documentação
-│   └── enunciado.pdf        # Enunciado do trabalho
-├── main.py                  # Programa principal
-├── requirements.txt         # Dependências
-├── README.md               # Este arquivo
-└── .gitignore              # Arquivos ignorados pelo Git
+├── src/
+│   ├── config.py            # Caminhos e pastas
+│   ├── data_and_train.py    # Geração do dataset e treinamento
+│   └── game.py              # Interface console Humano vs IA
+├── models/
+│   ├── best_model.pkl       # Melhor modelo global
+│   ├── scaler.pkl           # Scaler do melhor modelo (se houver)
+│   ├── model_metadata.pkl   # Metadados
+│   ├── knn_model.pkl        # Modelos por algoritmo
+│   ├── mlp_model.pkl
+│   ├── tree_model.pkl
+│   └── forest_model.pkl
+├── data/
+│   └── algorithm_comparison.csv  # Resultados de validação
+├── main.py
+├── requirements.txt
+└── README.md
 ```
 
-## 🎯 Como Funciona
+## Observações
 
-### Treinamento Inteligente
-- **`python main.py`**: Carrega modelo existente (instantâneo)
-- **`python main.py --train`**: Força novo treinamento (quando necessário)
-
-### Jogo
-1. **Dois jogadores humanos** se alternam
-2. **IA classifica** o estado do tabuleiro a cada jogada
-3. **Estatísticas em tempo real** da acurácia da IA
-4. **Interface intuitiva** com posições A1, B2, C3, etc.
-
-## 📊 Resultados Típicos
-
-- **Melhor Algoritmo**: MLP (Rede Neural)
-- **Acurácia no Teste**: ~57% (conjunto balanceado)
-- **Acurácia no Jogo**: ~75-90% (estados mais comuns)
-
-## 🔧 Variáveis Personalizadas
-
-Todas as variáveis seguem o padrão `nome_s` para simular `nome_$` conforme enunciado:
-- `SEED_s`, `model_s`, `X_train_s`, `y_test_s`, etc.
-
-## 👥 Autores
-
-[Adicione seu nome aqui]
-
-## 📝 Notas
-
-- Implementação **100% conforme o enunciado**
-- Dataset UCI original + estados gerados
-- Código otimizado para reutilizar modelos treinados
-- Interface clara e educativa
+- O jogo é Humano (X) vs IA (O). A IA joga aleatoriamente; a classificação do estado ("X vence", "O vence", "Empate", "Tem jogo", "Possibilidade de Fim de Jogo") é feita pelo modelo escolhido e exibida a cada turno com estatísticas de acerto.
+- Se um modelo específico não existir, o programa pode treinar automaticamente.
+- Para recomeçar, basta rodar novamente com `python main.py`.

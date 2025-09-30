@@ -1,47 +1,76 @@
-# game.py
-# Jogo humano vs humano. A IA só classifica o estado do tabuleiro.
+"""
+Interface do jogo humano vs IA com escolha do algoritmo.
+- Humano vs IA: a IA faz jogadas aleatórias (conforme pedido)
+- Menu para escolher qual modelo/algoritmo usar (carregado de models/)
+"""
 
 import joblib
 import numpy as np
 import os
 import sys
-from config import BEST_MODEL_PATH, SCALER_PATH, METADATA_PATH
+import random
+from typing import Optional, Tuple
 
-# Importar do arquivo atualizado
-try:
-    from data_and_train import winner_on_board_s, is_board_full_s, board_state_s
-except ImportError:
-    # Fallback para versão antiga
-    from data_and_train import winner_on_board, is_board_full, board_state
-    # Renomear funções para usar _s
-    winner_on_board_s = winner_on_board
-    is_board_full_s = is_board_full
-    board_state_s = board_state
+from config import BEST_MODEL_PATH, SCALER_PATH, METADATA_PATH, MODELS_DIR
+from data_and_train import winner_on_board, is_board_full, board_state
 
-print("=== Jogo da Velha com IA Classificadora ===")
-#print("🎮 Humano vs Humano (dois jogadores)")
-#print("🧠 A IA classifica o estado do tabuleiro a cada jogada")
-#print("=" * 50)
+ALGORITHM_LABELS = {
+    "knn": "k-NN (k Vizinhos)",
+    "mlp": "MLP (Rede Neural)",
+    "tree": "Árvore de Decisão",
+    "forest": "Random Forest",
+}
 
-if not os.path.exists(BEST_MODEL_PATH):
-    print(f"\n❌ ERRO: Modelo não encontrado em {BEST_MODEL_PATH}!")
-    print("Execute primeiro: python main.py --train")
-#    print("Isso irá treinar a IA e criar o modelo necessário.")
-    sys.exit(1)
+def get_model_paths_for_key(key: str):
+    model_path = os.path.join(MODELS_DIR, f"{key}_model.pkl")
+    scaler_path = os.path.join(MODELS_DIR, f"{key}_scaler.pkl")
+    return model_path, scaler_path if os.path.exists(scaler_path) else None
 
-#print("✅ Carregando modelo treinado...")
-model_s = joblib.load(BEST_MODEL_PATH)
-scaler_s = joblib.load(SCALER_PATH) if os.path.exists(SCALER_PATH) else None
-metadata_s = joblib.load(METADATA_PATH) if os.path.exists(METADATA_PATH) else None
+def choose_algorithm() -> Tuple[str, str, Optional[str]]:
+    """Menu para o usuário escolher entre os 4 algoritmos fixos."""
+    print("\nEscolha o algoritmo contra o qual deseja jogar:")
+    keys = ["knn", "mlp", "tree", "forest"]
+    for i, key in enumerate(keys, 1):
+        label = ALGORITHM_LABELS[key]
+        print(f"  {i}. {label}")
 
-if metadata_s:
-    algorithm_name_s = metadata_s.get("model_name", "Desconhecido")
-    print(f"✅ Algoritmo carregado: {algorithm_name_s}")
-else:
-    print("Modelo carregado!")
+    while True:
+        choice = input("Escolha [1-4]: ").strip()
+        if not choice.isdigit():
+            print("Digite um número válido.")
+            continue
+        idx = int(choice)
+        if 1 <= idx <= 4:
+            sel = keys[idx-1]
+            model_path, scaler_path = get_model_paths_for_key(sel)
+            return sel, model_path, scaler_path
+        print("Opção inválida.")
+
+def load_selected_model() -> Tuple[object, Optional[object], str]:
+    """Carrega o modelo escolhido pelo usuário."""
+    algo_key, model_path, scaler_path = choose_algorithm()
+    if not os.path.exists(model_path):
+        print(f"\nAviso: Modelo '{algo_key}' não encontrado em {model_path}.")
+        print("Iniciando treinamento de todos os algoritmos para gerar os modelos...")
+        try:
+            from data_and_train import train_and_compare_algorithms
+            train_and_compare_algorithms()
+        except Exception as e:
+            print(f"Falha ao treinar modelos: {e}")
+            print("Execute manualmente: python main.py --train")
+            sys.exit(1)
+        # Tenta novamente
+        if not os.path.exists(model_path):
+            print(f"Após o treinamento, o modelo '{algo_key}' ainda não foi encontrado.")
+            print("Tente treinar novamente com: python main.py --train")
+            sys.exit(1)
+    print(f"Carregando modelo: {os.path.basename(model_path)} [V]")
+    model = joblib.load(model_path)
+    scaler = joblib.load(scaler_path) if scaler_path and os.path.exists(scaler_path) else None
+    return model, scaler, algo_key
 
 class TicTacToeInterface:
-    def __init__(self, model, scaler=None):
+    def __init__(self, model, scaler=None, ai_random_moves=True):
         self.model = model
         self.scaler = scaler
         self.board = ['b'] * 9
@@ -50,13 +79,14 @@ class TicTacToeInterface:
         self.ai_predictions = []
         self.correct_predictions = 0
         self.total_predictions = 0
+        self.ai_random_moves = ai_random_moves
         
     def show_board(self):
         """Mostra o tabuleiro de forma visual"""
         def display_cell(v): 
-            if v == 'x': return '❌'
-            elif v == 'o': return '⭕'
-            else: return '⬜'
+            if v == 'x': return 'X'
+            elif v == 'o': return 'O'
+            else: return '_'
         
         print("\n" + "="*25)
         print("   A   B   C")
@@ -91,7 +121,7 @@ class TicTacToeInterface:
     def get_ai_prediction(self):
         """Obtém predição da IA sobre o estado atual"""
         pred = self.model.predict(self.encode_board())[0]
-        real = board_state_s(self.board)  # Usando função com _s
+        real = board_state(self.board)  # Usando função limpa
         
         self.total_predictions += 1
         is_correct = pred == real
@@ -123,141 +153,162 @@ class TicTacToeInterface:
         
         return row * 3 + col
 
-    def make_move(self, position):
-        """Executa uma jogada"""
-        if self.board[position] != 'b':
-            return False
-        
-        self.board[position] = self.current_player
-        self.move_history.append({
-            'position': position,
-            'player': self.current_player,
-            'move_notation': f"{chr(65 + position % 3)}{position // 3 + 1}"
-        })
-        
-        # Alterna jogador
-        self.current_player = 'o' if self.current_player == 'x' else 'x'
-        return True
-
     def get_move_from_player(self):
-        """Obtém jogada do jogador atual"""
-        player_symbol = '❌' if self.current_player == 'x' else '⭕'
+        """Obtém jogada válida do jogador atual"""
+        player_symbol = 'X' if self.current_player == 'x' else 'O'
         
         while True:
             try:
-                move_str = input(f"\nJogador {player_symbol} ({self.current_player.upper()}), sua vez! Digite a posição (ex: A1, B2, C3): ")
+                move_input = input(f"Jogador {player_symbol} ({self.current_player.upper()}), sua vez! Digite a posição (ex: A1, B2, C3): ").strip()
                 
-                if move_str.lower() in ['quit', 'sair', 'exit']:
-                    return None
+                if move_input.lower() == 'sair':
+                    print("Jogo encerrado pelo usuário.")
+                    sys.exit(0)
                 
-                position = self.parse_move(move_str)
+                position = self.parse_move(move_input)
+                
                 if position is None:
-                    print("❌ Formato inválido! Use formato A1, B2, C3, etc.")
+                    print("Formato inválido! Use formato A1, B2, C3, etc.")
                     continue
-                    
+                
                 if self.board[position] != 'b':
-                    print("❌ Posição já ocupada! Escolha outra.")
+                    print("Posição já ocupada! Escolha outra.")
                     continue
-                    
+                
                 return position
                 
-            except KeyboardInterrupt:
-                print("\n\nJogo interrompido pelo usuário.")
-                return None
-            except:
-                print("❌ Entrada inválida. Tente novamente.")
+            except (KeyboardInterrupt, EOFError):
+                print("\nJogo encerrado pelo usuário.")
+                sys.exit(0)
+
+    def get_random_ai_move(self):
+        """Seleciona uma jogada aleatória válida para a IA"""
+        empty_positions = [i for i, v in enumerate(self.board) if v == 'b']
+        if not empty_positions:
+            return None
+        return random.choice(empty_positions)
+
+    def make_move(self, position):
+        """Executa uma jogada"""
+        if self.board[position] == 'b':
+            self.board[position] = self.current_player
+            
+            move_notation = f"{chr(65 + position % 3)}{position // 3 + 1}"
+            self.move_history.append({
+                'player': self.current_player,
+                'position': position,
+                'notation': move_notation
+            })
+            return True
+        return False
+
+    def switch_player(self):
+        """Alterna entre jogadores"""
+        self.current_player = 'o' if self.current_player == 'x' else 'x'
 
     def show_game_stats(self):
-        """Mostra estatísticas da IA durante o jogo"""
+        """Mostra estatísticas da IA"""
         if self.total_predictions > 0:
             accuracy = (self.correct_predictions / self.total_predictions) * 100
-            print(f"\n📊 Estatísticas da IA:")
+            print(f"\nEstatísticas da IA:")
             print(f"   Predições corretas: {self.correct_predictions}/{self.total_predictions}")
             print(f"   Acurácia: {accuracy:.1f}%")
 
-    def show_move_history(self):
-        """Mostra histórico de jogadas"""
-        if self.move_history:
-            print(f"\n📝 Histórico de jogadas:")
-            for i, move in enumerate(self.move_history):
-                player_symbol = '❌' if move['player'] == 'x' else '⭕'
-                print(f"   {i+1}. {player_symbol} {move['player'].upper()} -> {move['move_notation']}")
-
     def play_game(self):
-        """Loop principal do jogo"""
-        print(f"\n🎮 Iniciando novo jogo!")
-        print("Jogador ❌ (X) começa")
+        """Executa uma partida completa"""
+        print("\nIniciando novo jogo!")
+        print("Modo: Humano (X) vs IA (O) - IA joga aleatoriamente")
+        print("Jogador X começa")
         print("Digite 'sair' a qualquer momento para encerrar")
         
         while True:
             self.show_board()
             
             # IA faz predição antes da jogada
-            if not (winner_on_board_s(self.board) or is_board_full_s(self.board)):
+            if not (winner_on_board(self.board) or is_board_full(self.board)):
                 pred, real, correct = self.get_ai_prediction()
                 
-                status_icon = "✅" if correct else "❌"
-                print(f"\n🤖 IA prediz: '{pred}' | Real: '{real}' {status_icon}")
+                status_icon = "V" if correct else "X"
+                print(f"\nIA prediz: '{pred}' | Real: '{real}' [{status_icon}]")
                 self.show_game_stats()
             
             # Verifica fim de jogo
-            winner = winner_on_board_s(self.board)
+            winner = winner_on_board(self.board)
             if winner:
-                winner_symbol = '❌' if winner == 'x' else '⭕'
-                print(f"\n🎉 FIM DE JOGO! Vencedor: {winner_symbol} ({winner.upper()})")
+                winner_symbol = 'X' if winner == 'x' else 'O'
+                print(f"\nFIM DE JOGO! Vencedor: {winner_symbol} ({winner.upper()})")
                 break
                 
-            if is_board_full_s(self.board):
-                print(f"\n🤝 FIM DE JOGO! EMPATE!")
+            if is_board_full(self.board):
+                print(f"\nFIM DE JOGO! EMPATE!")
                 break
             
-            # Jogada do usuário
-            position = self.get_move_from_player()
-            if position is None:  # usuário quer sair
-                break
-                
-            self.make_move(position)
+            # Jogada do usuário (humano como 'x')
+            if self.current_player == 'x':
+                position = self.get_move_from_player()
+                self.make_move(position)
+                self.switch_player()
+                continue
+
+            # Jogada da IA (aleatória), IA joga como 'o'
+            if self.current_player == 'o':
+                ai_pos = self.get_random_ai_move()
+                if ai_pos is not None:
+                    self.make_move(ai_pos)
+                    print(f"\nIA (O) jogou em: {chr(65 + ai_pos % 3)}{ai_pos // 3 + 1}")
+                self.switch_player()
         
-        # Estatísticas finais
-        print(f"\n" + "="*50)
-        self.show_move_history()
-        self.show_game_stats()
+        self.show_final_stats()
+
+    def show_final_stats(self):
+        """Mostra estatísticas finais da partida"""
+        print("\n" + "="*50)
+        print("\nHistórico de jogadas:")
+        for i, move in enumerate(self.move_history, 1):
+            symbol = 'X' if move['player'] == 'x' else 'O'
+            print(f"   {i}. {symbol} {move['player'].upper()} -> {move['notation']}")
         
-        # Detalhes das predições
-        if self.ai_predictions:
-            print(f"\n🔍 Detalhes das predições da IA:")
-            for pred in self.ai_predictions:
-                status = "✅" if pred['correct'] else "❌"
-                print(f"   Jogada {pred['move']+1}: Predito='{pred['predicted']}' | Real='{pred['real']}' {status}")
+        if self.total_predictions > 0:
+            accuracy = (self.correct_predictions / self.total_predictions) * 100
+            print(f"\nEstatísticas da IA:")
+            print(f"   Predições corretas: {self.correct_predictions}/{self.total_predictions}")
+            print(f"   Acurácia: {accuracy:.1f}%")
+            
+            print(f"\nDetalhes das predições da IA:")
+            for i, pred_info in enumerate(self.ai_predictions, 1):
+                status = "V" if pred_info['correct'] else "X"
+                print(f"   Jogada {i}: Predito='{pred_info['predicted']}' | Real='{pred_info['real']}' [{status}]")
         
-        print(f"="*50)
+        print("=" * 50)
 
 def main():
     """Função principal"""
     try:
-        interface_s = TicTacToeInterface(model_s, scaler_s)
+        model, scaler, algo_key = load_selected_model()
+        print(f"Usando algoritmo: {algo_key}")
+        interface = TicTacToeInterface(model, scaler, ai_random_moves=True)
         
         while True:
-            interface_s.play_game()
+            interface.play_game()
             
-            print(f"\n🎮 Deseja jogar novamente?")
+            print(f"\nDeseja jogar novamente?")
             choice = input("Digite 's' para sim, qualquer outra tecla para sair: ").strip().lower()
             
             if choice not in ['s', 'sim', 'y', 'yes']:
                 break
             
             # Reset para novo jogo
-            interface_s.board = ['b'] * 9
-            interface_s.current_player = 'x'
-            interface_s.move_history = []
-            interface_s.ai_predictions = []
-            interface_s.correct_predictions = 0
-            interface_s.total_predictions = 0
+            interface.board = ['b'] * 9
+            interface.current_player = 'x'
+            interface.move_history = []
+            interface.ai_predictions = []
+            interface.correct_predictions = 0
+            interface.total_predictions = 0
         
-        print("\n👋 Obrigado por jogar! Até a próxima!")
+        print("\nObrigado por jogar! Até a próxima!")
         
     except KeyboardInterrupt:
-        print("\n\n👋 Jogo encerrado pelo usuário. Até a próxima!")
+        print("\n\nJogo encerrado pelo usuário. Até a próxima!")
 
 if __name__ == "__main__":
     main()
