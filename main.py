@@ -47,11 +47,22 @@ def run_game():
         return False
     return True
 
+def run_gui():
+    """Executa a interface gráfica (Tkinter)"""
+    try:
+        from gui import run_gui as _run
+        _run()
+    except Exception as e:
+        print(f"Erro ao executar a GUI: {e}")
+        return False
+    return True
+
 def show_help():
     """Mostra ajuda do programa"""
     print("TRABALHO DE IA - JOGO DA VELHA")
     print("Opções:")
     print("  --train    Força o re-treinamento da IA")
+    print("  --gui      Abre a interface gráfica (Tkinter)")
     print("  --help     Mostra esta mensagem")
 
 def main():
@@ -64,6 +75,7 @@ def main():
         return
     
     force_train = "--train" in sys.argv
+    use_gui = "--gui" in sys.argv
     
     # Verifica se precisa treinar
     if force_train or not check_model_exists():
@@ -76,7 +88,10 @@ def main():
     else:
         print("Modelo encontrado [V]")
     
-    run_game()
+    if use_gui:
+        run_gui()
+    else:
+        run_game()
 
 if __name__ == "__main__":
     main()
